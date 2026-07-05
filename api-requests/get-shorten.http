@@ -1,0 +1,2 @@
+### GET request for shorten url
+GET localhost:8000/1
