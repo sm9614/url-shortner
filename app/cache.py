@@ -1,4 +1,5 @@
 import redis.asyncio as aioredis
+from redis.exceptions import RedisError
 
 REDIS_URL = "redis://localhost:6379"
 CACHE_TTL_SECONDS = 3600
@@ -14,14 +15,24 @@ async def close_cache():
     if client:
         await client.aclose()
 
-async def get_cache_url(short_code: str) -> str | None:
+async def get_cache_url(short_code: str) -> None | bytes | str:
     if client is None:
         return None
 
-    return await client.get(f"url:{short_code}")
+    try:
+        return await client.get(f"url:{short_code}")
+
+    except RedisError:
+        return None
 
 async def set_cache_url(short_code: str, original_url: str):
     if client is None:
         return
 
-    await client.set(f"url:{short_code}", original_url, ex=CACHE_TTL_SECONDS)
+    try:
+        await client.set(f"url:{short_code}",
+                         original_url,
+                         ex=CACHE_TTL_SECONDS)
+
+    except RedisError:
+        pass

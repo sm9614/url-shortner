@@ -1,11 +1,18 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, responses
 from fastapi.responses import RedirectResponse
-from starlette.responses import Response
 
 from app import database, cache, encoder
 from app.schemas import ShortenRequest, ShortenResponse
+
+logger = logging.getLogger("uvicorn.error")
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -15,7 +22,7 @@ async def lifespan(app: FastAPI):
     await cache.close_cache()
     await database.close_db()
 
-app = FastAPI(title="URL_Shortner", lifespan=lifespan)
+app = FastAPI(title="URL_Shortener", lifespan=lifespan)
 
 BASEURL = "http://localhost:8000"
 
@@ -35,6 +42,7 @@ async def shorten_url(request: ShortenRequest):
 async def redirect_to_url(short_code: str):
     cached = await cache.get_cache_url(short_code)
     if cached:
+        logging.info("Cache HIT for %s", cached)
         response = RedirectResponse(url=cached, status_code=307)
         response.headers["X-Cache"] = "HIT"
         return response
@@ -43,6 +51,7 @@ async def redirect_to_url(short_code: str):
     if not original_url:
         raise HTTPException(status_code=404, detail="Short URL not found")
 
+    logger.info("Cache MISS for %s", original_url)
     await cache.set_cache_url(short_code, original_url)
     response = RedirectResponse(url=original_url, status_code=307)
     response.headers["X-Cache"] = "MISS"
